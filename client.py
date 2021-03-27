@@ -3,7 +3,7 @@
 from thrift_gen import Transaction
 
 from thrift import Thrift
-from thrift.transport import TSocket
+from thrift.transport import TSSLSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
@@ -14,8 +14,7 @@ from random import randrange
 
 def main():
     # Make socket
-    # TODO: Use SSL sockets
-    transport = TSocket.TSocket('localhost', 9090)
+    transport = TSSLSocket.TSSLSocket(host='localhost', port=9090, certfile='.ssh/client.crt', keyfile='.ssh/client.key', ca_certs='.ssh/CA.pem')
 
     # Buffering is critical. Raw sockets are very slow
     transport = TTransport.TBufferedTransport(transport)
