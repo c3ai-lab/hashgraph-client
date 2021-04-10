@@ -24,7 +24,8 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] [-novalidate] [-ca_certs certs] [-keyfile keyfile] [-certfile certfile] function [arg1 [arg2...]]')
     print('')
     print('Functions:')
-    print('  void transfer(i32 payload, i32 target)')
+    print('  string transfer(i32 payload, i32 target)')
+    print('  Status status(string tx_id)')
     print('')
     sys.exit(0)
 
@@ -109,6 +110,12 @@ if cmd == 'transfer':
         print('transfer requires 2 args')
         sys.exit(1)
     pp.pprint(client.transfer(eval(args[0]), eval(args[1]),))
+
+elif cmd == 'status':
+    if len(args) != 1:
+        print('status requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.status(args[0],))
 
 else:
     print('Unrecognized method %s' % cmd)
