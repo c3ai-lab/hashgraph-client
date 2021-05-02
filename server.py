@@ -8,7 +8,9 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
-import uuid, random, time
+from ecdsa import VerifyingKey, SECP256k1
+
+import uuid, random, time, sha3
 
 class TransactionHandler:
     def __init__(self):
@@ -17,6 +19,22 @@ class TransactionHandler:
     def transfer(self, payload, target):
         tx_id = uuid.uuid4().hex
         print('transfer(%s, %d, %d)' % (tx_id, payload, target))
+        return str(tx_id)
+
+    def crypto_transfer(self, owner, amount, receiver, challenge, signature):
+        tx_id = uuid.uuid4().hex
+        print('crypto_transfer(%s, %s, %s)' % (tx_id, amount, receiver))
+
+        #Create address by hashing public key
+        public_key = VerifyingKey.from_string(owner, curve=SECP256k1)
+        keccak = sha3.keccak_256()
+        keccak.update(public_key.to_string())
+        address = '11x' + keccak.hexdigest()[24:]
+        print('Address: ', address)
+
+        check = public_key.verify(signature, bytes(amount) + str.encode(receiver) + challenge)
+        print('Signature verification:', check)
+
         return str(tx_id)
     
     def status(self, tx_id):
@@ -29,6 +47,12 @@ class TransactionHandler:
 
         print('status(%s, %s, %d)' % (tx_id, status.status, status.consensus_time))
         return status
+    
+    def balance(self, address):
+        balance = random.randrange(1000)
+
+        print('balance(%s, %s)' % (address, balance))
+        return balance
 
 
 if __name__ == '__main__':

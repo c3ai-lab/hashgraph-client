@@ -28,10 +28,30 @@ class Iface(object):
         """
         pass
 
+    def crypto_transfer(self, owner, amount, receiver, challenge, signature):
+        """
+        Parameters:
+         - owner
+         - amount
+         - receiver
+         - challenge
+         - signature
+
+        """
+        pass
+
     def status(self, tx_id):
         """
         Parameters:
          - tx_id
+
+        """
+        pass
+
+    def balance(self, address):
+        """
+        Parameters:
+         - address
 
         """
         pass
@@ -78,6 +98,46 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "transfer failed: unknown result")
 
+    def crypto_transfer(self, owner, amount, receiver, challenge, signature):
+        """
+        Parameters:
+         - owner
+         - amount
+         - receiver
+         - challenge
+         - signature
+
+        """
+        self.send_crypto_transfer(owner, amount, receiver, challenge, signature)
+        return self.recv_crypto_transfer()
+
+    def send_crypto_transfer(self, owner, amount, receiver, challenge, signature):
+        self._oprot.writeMessageBegin('crypto_transfer', TMessageType.CALL, self._seqid)
+        args = crypto_transfer_args()
+        args.owner = owner
+        args.amount = amount
+        args.receiver = receiver
+        args.challenge = challenge
+        args.signature = signature
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_crypto_transfer(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = crypto_transfer_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "crypto_transfer failed: unknown result")
+
     def status(self, tx_id):
         """
         Parameters:
@@ -110,13 +170,47 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "status failed: unknown result")
 
+    def balance(self, address):
+        """
+        Parameters:
+         - address
+
+        """
+        self.send_balance(address)
+        return self.recv_balance()
+
+    def send_balance(self, address):
+        self._oprot.writeMessageBegin('balance', TMessageType.CALL, self._seqid)
+        args = balance_args()
+        args.address = address
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_balance(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = balance_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "balance failed: unknown result")
+
 
 class Processor(Iface, TProcessor):
     def __init__(self, handler):
         self._handler = handler
         self._processMap = {}
         self._processMap["transfer"] = Processor.process_transfer
+        self._processMap["crypto_transfer"] = Processor.process_crypto_transfer
         self._processMap["status"] = Processor.process_status
+        self._processMap["balance"] = Processor.process_balance
         self._on_message_begin = None
 
     def on_message_begin(self, func):
@@ -162,6 +256,29 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
+    def process_crypto_transfer(self, seqid, iprot, oprot):
+        args = crypto_transfer_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = crypto_transfer_result()
+        try:
+            result.success = self._handler.crypto_transfer(args.owner, args.amount, args.receiver, args.challenge, args.signature)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("crypto_transfer", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
     def process_status(self, seqid, iprot, oprot):
         args = status_args()
         args.read(iprot)
@@ -181,6 +298,29 @@ class Processor(Iface, TProcessor):
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
         oprot.writeMessageBegin("status", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_balance(self, seqid, iprot, oprot):
+        args = balance_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = balance_result()
+        try:
+            result.success = self._handler.balance(args.address)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("balance", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -323,6 +463,177 @@ transfer_result.thrift_spec = (
 )
 
 
+class crypto_transfer_args(object):
+    """
+    Attributes:
+     - owner
+     - amount
+     - receiver
+     - challenge
+     - signature
+
+    """
+
+
+    def __init__(self, owner=None, amount=None, receiver=None, challenge=None, signature=None,):
+        self.owner = owner
+        self.amount = amount
+        self.receiver = receiver
+        self.challenge = challenge
+        self.signature = signature
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.owner = iprot.readBinary()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I32:
+                    self.amount = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.receiver = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.challenge = iprot.readBinary()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRING:
+                    self.signature = iprot.readBinary()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('crypto_transfer_args')
+        if self.owner is not None:
+            oprot.writeFieldBegin('owner', TType.STRING, 1)
+            oprot.writeBinary(self.owner)
+            oprot.writeFieldEnd()
+        if self.amount is not None:
+            oprot.writeFieldBegin('amount', TType.I32, 2)
+            oprot.writeI32(self.amount)
+            oprot.writeFieldEnd()
+        if self.receiver is not None:
+            oprot.writeFieldBegin('receiver', TType.STRING, 3)
+            oprot.writeString(self.receiver.encode('utf-8') if sys.version_info[0] == 2 else self.receiver)
+            oprot.writeFieldEnd()
+        if self.challenge is not None:
+            oprot.writeFieldBegin('challenge', TType.STRING, 4)
+            oprot.writeBinary(self.challenge)
+            oprot.writeFieldEnd()
+        if self.signature is not None:
+            oprot.writeFieldBegin('signature', TType.STRING, 5)
+            oprot.writeBinary(self.signature)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(crypto_transfer_args)
+crypto_transfer_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'owner', 'BINARY', None, ),  # 1
+    (2, TType.I32, 'amount', None, None, ),  # 2
+    (3, TType.STRING, 'receiver', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'challenge', 'BINARY', None, ),  # 4
+    (5, TType.STRING, 'signature', 'BINARY', None, ),  # 5
+)
+
+
+class crypto_transfer_result(object):
+    """
+    Attributes:
+     - success
+
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.STRING:
+                    self.success = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('crypto_transfer_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRING, 0)
+            oprot.writeString(self.success.encode('utf-8') if sys.version_info[0] == 2 else self.success)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(crypto_transfer_result)
+crypto_transfer_result.thrift_spec = (
+    (0, TType.STRING, 'success', 'UTF8', None, ),  # 0
+)
+
+
 class status_args(object):
     """
     Attributes:
@@ -444,6 +755,129 @@ class status_result(object):
 all_structs.append(status_result)
 status_result.thrift_spec = (
     (0, TType.STRUCT, 'success', [Status, None], None, ),  # 0
+)
+
+
+class balance_args(object):
+    """
+    Attributes:
+     - address
+
+    """
+
+
+    def __init__(self, address=None,):
+        self.address = address
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.address = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('balance_args')
+        if self.address is not None:
+            oprot.writeFieldBegin('address', TType.STRING, 1)
+            oprot.writeString(self.address.encode('utf-8') if sys.version_info[0] == 2 else self.address)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(balance_args)
+balance_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'address', 'UTF8', None, ),  # 1
+)
+
+
+class balance_result(object):
+    """
+    Attributes:
+     - success
+
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.I32:
+                    self.success = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('balance_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.I32, 0)
+            oprot.writeI32(self.success)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(balance_result)
+balance_result.thrift_spec = (
+    (0, TType.I32, 'success', None, None, ),  # 0
 )
 fix_spec(all_structs)
 del all_structs
