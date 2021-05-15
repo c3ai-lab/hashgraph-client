@@ -12,7 +12,7 @@ from random import randrange
 from Crypto.Hash import keccak
 
 from ecdsa import SigningKey, SECP256k1
-import sha3, random, binascii
+import sha3, random, binascii, hashlib
 
 
 pub_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "public_key.pem")
@@ -21,6 +21,7 @@ priv_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "private_
 #python3 client.py -n localhost -p 9090 --calls 1000 --delay 1
 #python3 client.py -n localhost -p 9090 --amount 11 --target 11xa202effc3bb275689552d1ad1b0264c68de036dd
 #python3 client.py -n localhost -p 9090 --status e45cc861a742436f9a27f88c081433d1
+#python3 client.py -n localhost -p 9090 --balance 11xa202effc3bb275689552d1ad1b0264c68de036dd
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--node", "-n", help="Define node address")
@@ -63,6 +64,7 @@ def main():
         transport.close()
     elif args.amount and args.target:
         transport.open()
+        #transfer(int(args.amount), int(args.target), client)
         crypto_transfer(int(args.amount), str(args.target), client)
         transport.close()
     elif args.calls and args.delay:
@@ -123,13 +125,14 @@ def transfer(amount, target, client):
 
 def crypto_transfer(amount, receiver, client):
     public_key, private_key = get_key_pair()
-    challenge = os.urandom(10)
-    signature = private_key.sign(bytes(amount) + str.encode(receiver) + challenge)
+    challenge   = client.challenge()
+    message     = challenge + b"|" + bytes(amount) + b"|" + str.encode(receiver)
+    signature   = private_key.sign(message, hashfunc=hashlib.sha256, sigencode=ecdsa.util.sigencode_der)
 
-    #check = public_key.verify(sig, bytes(amount) + str.encode(receiver) + challenge)
+    #check      = public_key.verify(signature, message, hashlib.sha256, ecdsa.util.sigdecode_der)
     #print('check: %s' % check)
 
-    tx_id = client.crypto_transfer(public_key.to_string(), amount, receiver, challenge, signature)
+    tx_id = client.crypto_transfer(public_key.to_der(), amount, receiver, challenge, signature)
     print('tx_id: %s' % tx_id)
 
 def status(tx_id, client):

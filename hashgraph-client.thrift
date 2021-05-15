@@ -13,4 +13,6 @@ service Transaction {
    Status status(1:string tx_id)
 
    i32 balance(1:string address)
+
+   binary challenge()
 }

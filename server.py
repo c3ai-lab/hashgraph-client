@@ -8,9 +8,9 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
-from ecdsa import VerifyingKey, SECP256k1
+from ecdsa import VerifyingKey, SECP256k1, util
 
-import uuid, random, time, sha3
+import uuid, random, time, hashlib, os
 
 class TransactionHandler:
     def __init__(self):
@@ -26,13 +26,14 @@ class TransactionHandler:
         print('crypto_transfer(%s, %s, %s)' % (tx_id, amount, receiver))
 
         #Create address by hashing public key
-        public_key = VerifyingKey.from_string(owner, curve=SECP256k1)
-        keccak = sha3.keccak_256()
-        keccak.update(public_key.to_string())
-        address = '11x' + keccak.hexdigest()[24:]
+        public_key = VerifyingKey.from_der(owner)
+        public_key_hash = hashlib.sha3_256()
+        public_key_hash.update(public_key.to_string())
+        address = '11x' + public_key_hash.hexdigest()[24:]
         print('Address: ', address)
 
-        check = public_key.verify(signature, bytes(amount) + str.encode(receiver) + challenge)
+        message = challenge + b"|" + bytes(amount) + b"|" + str.encode(receiver)
+        check   = public_key.verify(signature, message, hashlib.sha256, util.sigdecode_der)
         print('Signature verification:', check)
 
         return str(tx_id)
@@ -53,6 +54,13 @@ class TransactionHandler:
 
         print('balance(%s, %s)' % (address, balance))
         return balance
+
+    def challenge(self):
+        challenge = os.urandom(10)
+        #Store this challenge in the hashgraph for future retrieval and verification...
+
+        print('challenge(%s)' % (challenge.hex()))
+        return challenge
 
 
 if __name__ == '__main__':
