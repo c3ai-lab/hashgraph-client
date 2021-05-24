@@ -130,7 +130,7 @@ def checksum(address):
 def get_own_address():
     public_key = get_key_pair()[0]
     public_key_hash = hashlib.sha3_256()
-    public_key_hash.update(public_key.to_string())
+    public_key_hash.update(public_key.to_der())
     address = '11x' + public_key_hash.hexdigest()[24:]
 
     return address

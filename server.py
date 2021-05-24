@@ -28,7 +28,7 @@ class TransactionHandler:
         #Create address by hashing public key
         public_key = VerifyingKey.from_der(owner)
         public_key_hash = hashlib.sha3_256()
-        public_key_hash.update(public_key.to_string())
+        public_key_hash.update(public_key.to_der())
         address = '11x' + public_key_hash.hexdigest()[24:]
         print('Address: ', address)
 
