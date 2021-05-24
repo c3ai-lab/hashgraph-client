@@ -11,27 +11,34 @@ import time, uuid, random, sys, getopt, argparse, ecdsa, pathlib, os, codecs, sh
 from random import randrange
 from Crypto.Hash import keccak
 
-from ecdsa import SigningKey, SECP256k1
+from ecdsa import SigningKey, SECP256k1, VerifyingKey
 import sha3, random, binascii, hashlib
 
 
 pub_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "public_key.pem")
 priv_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "private_key.pem")
 
-#python3 client.py -n localhost -p 9090 --calls 1000 --delay 1
-#python3 client.py -n localhost -p 9090 --amount 11 --target 11xa202effc3bb275689552d1ad1b0264c68de036dd
-#python3 client.py -n localhost -p 9090 --status e45cc861a742436f9a27f88c081433d1
-#python3 client.py -n localhost -p 9090 --balance 11xa202effc3bb275689552d1ad1b0264c68de036dd
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --calls 1000 --delay 1
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --amount 11 --target 11xa202effc3bb275689552d1ad1b0264c68de036dd
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --status e45cc861a742436f9a27f88c081433d1
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --balance
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --balance 11xa202effc3bb275689552d1ad1b0264c68de036dd
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --history 11xa202effc3bb275689552d1ad1b0264c68de036dd
+#python3 client.py --address
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--node", "-n", help="Define node address")
     parser.add_argument("--port", "-p", help="Define node port")
-    parser.add_argument("--calls", "-c", help="Set amount of transaction calls to be done against the node")
+    parser.add_argument("--cert", "-c", help="Set path to node certificate. Can either be relative or absolute.")
+    parser.add_argument("--calls", help="Set amount of transaction calls to be done against the node")
     parser.add_argument("--delay", "-d", help="Set delay between amount of transaction calls")
     parser.add_argument("--amount", "-a", help="Set amount to be transferred")
     parser.add_argument("--target", "-t", help="Set target for transfer")
     parser.add_argument("--status", "-s", help="Request status from transaction id")
-    parser.add_argument("--balance", "-b", help="Get balance from address")
+    parser.add_argument("--balance", "-b", help="Get balance from address. Leave address empty to retrieve own balance.", nargs='?', const=get_own_address())
+    parser.add_argument("--history", help="Get balance history for specified address")
+    parser.add_argument("--address", help="Get own address", action='store_true')
 
     try:
         args = parser.parse_args()
@@ -39,13 +46,18 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    if args.node and args.port:
+    if args.node and args.port and args.cert:
         print("Set node to %s" % args.node)
         print("Set port to %s" % args.port)
-        transport = TSSLSocket.TSSLSocket(host=args.node, port=args.port, certfile='.ssh/client.crt', keyfile='.ssh/client.key', ca_certs='.ssh/CA.pem')
-    elif args.node:
+        print("Set cert path to %s" % args.cert)
+        transport = TSSLSocket.TSSLSocket(host=args.node, port=args.port, ca_certs=args.cert)
+    elif args.node and args.cert:
         print("Set node to %s" % args.node)
-        transport = TSSLSocket.TSSLSocket(host=args.node, certfile='.ssh/client.crt', keyfile='.ssh/client.key', ca_certs='.ssh/CA.pem')
+        print("Set cert path to %s" % args.cert)
+        transport = TSSLSocket.TSSLSocket(host=args.node, ca_certs=args.cert)
+    elif args.address:
+        address()
+        sys.exit(0)
     else:
         parser.print_help()
         sys.exit(0)
@@ -61,6 +73,10 @@ def main():
     elif args.balance:
         transport.open()
         balance(args.balance, client)
+        transport.close()
+    elif args.history:
+        transport.open()
+        history(args.history, client)
         transport.close()
     elif args.amount and args.target:
         transport.open()
@@ -111,6 +127,14 @@ def checksum(address):
     
     return '11x' + checksum
 
+def get_own_address():
+    public_key = get_key_pair()[0]
+    public_key_hash = hashlib.sha3_256()
+    public_key_hash.update(public_key.to_string())
+    address = '11x' + public_key_hash.hexdigest()[24:]
+
+    return address
+
 def benchmark(calls, delay, client):
     starttime = time.time()
     while True:
@@ -125,15 +149,15 @@ def transfer(amount, target, client):
 
 def crypto_transfer(amount, receiver, client):
     public_key, private_key = get_key_pair()
+
     challenge   = client.challenge()
-    message     = challenge + b"|" + bytes(amount) + b"|" + str.encode(receiver)
+    message     = challenge + b"|" + bytes(f'{amount}', "utf-8") + b"|" + bytes(receiver, 'utf-8')
     signature   = private_key.sign(message, hashfunc=hashlib.sha256, sigencode=ecdsa.util.sigencode_der)
 
     #check      = public_key.verify(signature, message, hashlib.sha256, ecdsa.util.sigdecode_der)
     #print('check: %s' % check)
 
-    tx_id = client.crypto_transfer(public_key.to_der(), amount, receiver, challenge, signature)
-    print('tx_id: %s' % tx_id)
+    client.crypto_transfer(public_key.to_der(), amount, receiver, challenge, signature)
 
 def status(tx_id, client):
     status = client.status(tx_id)
@@ -143,7 +167,21 @@ def status(tx_id, client):
 
 def balance(address, client):
     balance = client.balance(address)
-    print('balance: %s' % balance)
+
+    if address == get_own_address():
+        print('Your (%s) balance is: %s' % (address, balance))
+    else:
+        print('balance(%s): %s' % (address, balance))
+
+def history(address, client):
+    history = client.balance_history(address)
+    
+    print('Retrieved %s historic transactions: ' % len(history))
+
+    print('history: %s' % history)
+
+def address():    
+    print('Your address is:', get_own_address())
 
 if __name__ == '__main__':
     try:

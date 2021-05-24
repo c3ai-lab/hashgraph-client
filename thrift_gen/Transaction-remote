@@ -25,10 +25,11 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('')
     print('Functions:')
     print('  string transfer(i32 payload, i32 target)')
-    print('  string crypto_transfer(string owner, i32 amount, string receiver, string challenge, string signature)')
+    print('  void crypto_transfer(string owner, i32 amount, string receiver, string challenge, string signature)')
     print('  Status status(string tx_id)')
     print('  i32 balance(string address)')
     print('  string challenge()')
+    print('   balance_history(string ownerId)')
     print('')
     sys.exit(0)
 
@@ -137,6 +138,12 @@ elif cmd == 'challenge':
         print('challenge requires 0 args')
         sys.exit(1)
     pp.pprint(client.challenge())
+
+elif cmd == 'balance_history':
+    if len(args) != 1:
+        print('balance_history requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.balance_history(args[0],))
 
 else:
     print('Unrecognized method %s' % cmd)
