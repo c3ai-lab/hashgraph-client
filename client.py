@@ -23,6 +23,7 @@ priv_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "private_
 #python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --status e45cc861a742436f9a27f88c081433d1
 #python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --balance
 #python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --balance 11xa202effc3bb275689552d1ad1b0264c68de036dd
+#python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --history
 #python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --history 11xa202effc3bb275689552d1ad1b0264c68de036dd
 #python3 client.py --address
 
@@ -37,7 +38,7 @@ def main():
     parser.add_argument("--target", "-t", help="Set target for transfer")
     parser.add_argument("--status", "-s", help="Request status from transaction id")
     parser.add_argument("--balance", "-b", help="Get balance from address. Leave address empty to retrieve own balance.", nargs='?', const=get_own_address())
-    parser.add_argument("--history", help="Get balance history for specified address")
+    parser.add_argument("--history", help="Get balance history for specified address. Leave address empty to retrieve own history.", nargs='?', const=get_own_address())
     parser.add_argument("--address", help="Get own address", action='store_true')
 
     try:
@@ -178,7 +179,10 @@ def history(address, client):
     
     print('Retrieved %s historic transactions: ' % len(history))
 
-    print('history: %s' % history)
+    if address == get_own_address():
+        print('Your (%s) history is: %s' % (address, history))
+    else:
+        print('history: %s' % history)
 
 def address():    
     print('Your address is:', get_own_address())
