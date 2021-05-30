@@ -12,7 +12,7 @@ from random import randrange
 from Crypto.Hash import keccak
 
 from ecdsa import SigningKey, SECP256k1, VerifyingKey
-import sha3, random, binascii, hashlib
+import sha3, random, binascii, hashlib, re
 
 
 pub_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "public_key.pem")
@@ -80,10 +80,13 @@ def main():
         history(args.history, client)
         transport.close()
     elif args.amount and args.target:
-        transport.open()
-        #transfer(int(args.amount), int(args.target), client)
-        crypto_transfer(int(args.amount), str(args.target), client)
-        transport.close()
+        if bool(re.match(r"^11x[a-fA-F0-9]{40}$", args.target)):
+            transport.open()
+            #transfer(int(args.amount), int(args.target), client)
+            crypto_transfer(int(args.amount), str(args.target), client)
+            transport.close()
+        else:
+            print('Wrong address!')
     elif args.calls and args.delay:
         transport.open()
         benchmark(int(args.calls), int(args.delay), client)
