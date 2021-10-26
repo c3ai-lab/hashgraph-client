@@ -9,7 +9,6 @@ from thrift.protocol import TBinaryProtocol
 
 import time, uuid, random, sys, getopt, argparse, ecdsa, pathlib, os, codecs, sha3
 from random import randrange
-from Crypto.Hash import keccak
 
 from ecdsa import SigningKey, SECP256k1, VerifyingKey
 import sha3, random, binascii, hashlib, re

@@ -10,8 +10,7 @@ It currently supports the following functionalities:
 - Node specification
 
 ## Prerequisites
-- python3
-- thrift
+- python3 (including *thrift*, *ecdsa* and *pysha3* modules)
 
 ### Thrift
 You can either use the included `thrift_gen` folder or generate your own by running `thrift -r -out . --gen py hashgraph-client.thrift`
