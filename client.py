@@ -7,7 +7,7 @@ from thrift.transport import TSSLSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
-import time, uuid, random, sys, getopt, argparse, ecdsa, pathlib, os, codecs, sha3
+import time, uuid, random, sys, getopt, argparse, ecdsa, pathlib, os, codecs, sha3, time
 from random import randrange
 
 from ecdsa import SigningKey, SECP256k1, VerifyingKey
@@ -16,6 +16,7 @@ import sha3, random, binascii, hashlib, re
 
 pub_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "public_key.pem")
 priv_key_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "private_key.pem")
+log_file_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "logfile.log")
 
 #python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --calls 1000 --delay 1
 #python3 client.py -n localhost -p 9090 -c .ssh/CA.pem --amount 11 --target 11xa202effc3bb275689552d1ad1b0264c68de036dd
@@ -94,6 +95,11 @@ def main():
         parser.print_help()
         sys.exit(0)
 
+def write_log(text, file):
+    f = open(file, 'a')           # 'a' will append to an existing file if it exists
+    f.write("{}\n".format(text))  # write the text to the logfile and move to next line
+    return 
+
 def generate_key_pair():
     priv_key = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)
     pub_key = priv_key.get_verifying_key()
@@ -149,6 +155,7 @@ def benchmark(calls, delay, client):
 def transfer(amount, target, client):
     tx_id = client.transfer(amount, target)
     print('tx_id: %s' % tx_id)
+    write_log(round(time.time() * 1000), log_file_path)
 
 def crypto_transfer(amount, receiver, client):
     public_key, private_key = get_key_pair()
@@ -161,6 +168,7 @@ def crypto_transfer(amount, receiver, client):
     #print('check: %s' % check)
 
     client.crypto_transfer(public_key.to_der(), amount, receiver, challenge, signature)
+    write_log(round(time.time() * 1000), log_file_path)
 
 def status(tx_id, client):
     status = client.status(tx_id)
